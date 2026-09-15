@@ -111,6 +111,14 @@ clip-III conditions. Replacement controls use the 20 fixed seeds 1701--1720.
 The runner reproduces each checkpoint's original validation UAR before running
 controls, stores replacement manifests and logits, and never loads test rows.
 
+Attach the saved `hief-interventions` output to
+`experiments/kaggle_phase1_intervention_statistics.ipynb` for a CPU-only audit
+of UAR, NLL, correct-class probability, prediction flips, and per-class recall.
+The accompanying runner performs a fixed 5,000-replicate hierarchical bootstrap
+over model seeds, source folders, and replacement manifests. These intervals
+are explicitly diagnostic because validation selected the checkpoints and only
+five model seeds and eight validation source folders are available.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
