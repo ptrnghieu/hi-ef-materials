@@ -119,6 +119,22 @@ over model seeds, source folders, and replacement manifests. These intervals
 are explicitly diagnostic because validation selected the checkpoints and only
 five model seeds and eight validation source folders are available.
 
+## Party-A emotion-label oracle
+
+Run `experiments/kaggle_phase1_label_oracle.ipynb` after attaching the feature
+dataset and the saved `hief-multiseed-validation` output. This is the missing
+construct-validity diagnostic: it compares context-only, context plus raw clip
+III, and context plus the ground-truth emotion label of Party A under the same
+source-folder split and five training seeds.
+
+The notebook also evaluates the five frozen label-oracle checkpoints under 20
+fixed global label shuffles and 20 fixed wrong-emotion permutations. Both
+controls preserve the validation label distribution; the wrong-emotion control
+guarantees that every Party-A label changes. The runner performs a forward and
+backward preflight before training, stores all manifests and validation logits,
+and never loads the test partition. Because it supplies a ground-truth input,
+the label model is an oracle diagnostic rather than a deployable baseline.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
