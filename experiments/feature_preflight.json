@@ -1,0 +1,85 @@
+{
+  "by_position": {
+    "clip1": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 146,
+      "fewer_than_8_valid_face_rate": 0.051590106007067135,
+      "unique_clips": 2830,
+      "zero_valid_face_clips": 45,
+      "zero_valid_face_rate": 0.015901060070671377
+    },
+    "clip2": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 124,
+      "fewer_than_8_valid_face_rate": 0.04381625441696113,
+      "unique_clips": 2830,
+      "zero_valid_face_clips": 34,
+      "zero_valid_face_rate": 0.012014134275618375
+    },
+    "clip3": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 46,
+      "fewer_than_8_valid_face_rate": 0.01625441696113074,
+      "unique_clips": 2830,
+      "zero_valid_face_clips": 13,
+      "zero_valid_face_rate": 0.004593639575971731
+    }
+  },
+  "by_split": {
+    "test": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 48,
+      "fewer_than_8_valid_face_rate": 0.05036726128016789,
+      "unique_clips": 953,
+      "zero_valid_face_clips": 16,
+      "zero_valid_face_rate": 0.016789087093389297
+    },
+    "train": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 177,
+      "fewer_than_8_valid_face_rate": 0.03913331859385364,
+      "unique_clips": 4523,
+      "zero_valid_face_clips": 51,
+      "zero_valid_face_rate": 0.01127570196772054
+    },
+    "val": {
+      "all_zero_audio_features": 0,
+      "all_zero_face_features": 0,
+      "audio_not_found": 0,
+      "fewer_than_8_valid_face_clips": 44,
+      "fewer_than_8_valid_face_rate": 0.04435483870967742,
+      "unique_clips": 992,
+      "zero_valid_face_clips": 10,
+      "zero_valid_face_rate": 0.010080645161290322
+    }
+  },
+  "diagnostic_counts": {
+    "clip_id_mismatches": 0,
+    "invalid_face_masks": 0,
+    "load_errors": 0,
+    "missing_files": 0,
+    "nonfinite_tensors": 0,
+    "wrong_shapes": 0
+  },
+  "diagnostic_examples": {
+    "clip_id_mismatches": [],
+    "invalid_face_masks": [],
+    "load_errors": [],
+    "missing_files": [],
+    "nonfinite_tensors": [],
+    "wrong_shapes": []
+  },
+  "manifest_rows": 2830,
+  "passed": true,
+  "unique_input_clips": 6468
+}
