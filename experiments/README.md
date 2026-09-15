@@ -63,3 +63,19 @@ test_rows = manifest[manifest["split"] == "test"]
 Do not select seeds, checkpoints, or model variants using the test partition.
 Select checkpoints using validation UAR and evaluate the frozen test partition
 only after the experiment configuration is fixed.
+
+## Audit frozen features on Kaggle
+
+Before training, run the aggregate feature audit against clips I--III:
+
+```bash
+python experiments/feature_preflight.py \
+  --manifest experiments/manifests/source_folder_split_seed42.csv \
+  --features-dir /kaggle/input/datasets/ptrnghieu/hi-ef-features-v2 \
+  --output /kaggle/working/feature_preflight.json
+```
+
+Missing/corrupt files, clip-id mismatches, unexpected shapes, non-finite values,
+or malformed face masks fail the audit. Missing faces and audio are reported by
+clip position and split as diagnostics because they may be valid properties of
+the released data.
