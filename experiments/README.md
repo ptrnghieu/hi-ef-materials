@@ -94,6 +94,13 @@ with a Kaggle T4 GPU. It trains the context and full models on all training
 samples for seed 42, selects checkpoints using validation only, and saves full
 validation logits. The notebook deliberately leaves the test split unevaluated.
 
+The seed-42 notebook above is a pipeline pilot, not the canonical multi-seed
+result. The canonical run is `experiments/kaggle_phase1_multiseed_validation.ipynb`.
+It invokes `experiments/run_validation_matrix.py` once to run the fixed seeds
+`42, 123, 456, 789, 1024` for both context and full models. It writes a single
+auditable JSON summary and CSV table, records code/data hashes, verifies every
+run configuration, and rejects any run containing test metrics.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
