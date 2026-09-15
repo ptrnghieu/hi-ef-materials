@@ -101,6 +101,16 @@ It invokes `experiments/run_validation_matrix.py` once to run the fixed seeds
 auditable JSON summary and CSV table, records code/data hashes, verifies every
 run configuration, and rejects any run containing test metrics.
 
+## Validation-only clip-III interventions
+
+After saving the canonical multi-seed output, attach that notebook output and
+the feature dataset to `experiments/kaggle_phase1_interventions.ipynb`. The
+notebook uses the five frozen full-model checkpoints and evaluates true, zero,
+global-shuffle, same-source/wrong-emotion, and same-emotion/different-source
+clip-III conditions. Replacement controls use the 20 fixed seeds 1701--1720.
+The runner reproduces each checkpoint's original validation UAR before running
+controls, stores replacement manifests and logits, and never loads test rows.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
