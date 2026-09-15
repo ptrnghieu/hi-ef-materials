@@ -79,3 +79,14 @@ Missing/corrupt files, clip-id mismatches, unexpected shapes, non-finite values,
 or malformed face masks fail the audit. Missing faces and audio are reported by
 clip position and split as diagnostics because they may be valid properties of
 the released data.
+
+## Baseline smoke test
+
+Run `experiments/kaggle_phase1_smoke.ipynb` with a Kaggle T4 GPU. It trains ten
+batches per epoch for two epochs for both B1/context (clips I--II) and B2/full
+(clips I--III). The smoke test validates training, checkpointing, and artifact
+generation; its metrics are not research results. Test evaluation is disabled.
+
+The runner supports `--face-pooling masked` (corrected primary setting) and
+`--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
+center-crop fallbacks are excluded according to `face_valid_mask`.
