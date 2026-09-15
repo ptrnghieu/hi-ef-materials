@@ -135,6 +135,15 @@ backward preflight before training, stores all manifests and validation logits,
 and never loads the test partition. Because it supplies a ground-truth input,
 the label model is an oracle diagnostic rather than a deployable baseline.
 
+Attach the saved baseline and label-oracle outputs to
+`experiments/kaggle_phase1_label_oracle_statistics.ipynb`. This CPU-only job
+computes paired UAR, NLL, correct-class probability, prediction flips, and
+per-class recall for raw-versus-context, oracle-versus-context,
+oracle-versus-raw, and both label controls. Its hierarchical bootstrap samples
+model seeds and source folders for model comparisons, and additionally samples
+replacement manifests for label controls. The resulting intervals remain
+validation diagnostics rather than confirmatory test estimates.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
