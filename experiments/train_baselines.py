@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import math
+import os
 import random
 from functools import lru_cache
 from pathlib import Path
@@ -24,13 +25,22 @@ EMOTION_TO_ID = {emotion: index for index, emotion in enumerate(EMOTIONS)}
 
 
 def seed_everything(seed: int) -> None:
+    # Required by deterministic CUDA matrix multiplication. This must be set
+    # before the first CUDA operation in the process.
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.use_deterministic_algorithms(True, warn_only=False)
+    if torch.cuda.is_available():
+        # Flash and memory-efficient scaled-dot-product attention may select
+        # nondeterministic backward kernels. The math backend is deterministic.
+        torch.backends.cuda.enable_flash_sdp(False)
+        torch.backends.cuda.enable_mem_efficient_sdp(False)
+        torch.backends.cuda.enable_math_sdp(True)
 
 
 def seed_worker(worker_id: int) -> None:
@@ -108,7 +118,9 @@ class TemporalEncoder(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.encoder = nn.TransformerEncoder(layer, num_layers=layers)
+        self.encoder = nn.TransformerEncoder(
+            layer, num_layers=layers, enable_nested_tensor=False
+        )
 
     def forward(
         self, features: torch.Tensor, valid_mask: torch.Tensor | None = None
@@ -150,7 +162,9 @@ class ClipEncoder(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.fusion = nn.TransformerEncoder(layer, num_layers=1)
+        self.fusion = nn.TransformerEncoder(
+            layer, num_layers=1, enable_nested_tensor=False
+        )
         self.norm = nn.LayerNorm(d_model)
 
     def forward(self, clip: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -186,7 +200,9 @@ class FrozenFeatureBaseline(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.inter_encoder = nn.TransformerEncoder(layer, num_layers=inter_layers)
+        self.inter_encoder = nn.TransformerEncoder(
+            layer, num_layers=inter_layers, enable_nested_tensor=False
+        )
         self.head = nn.Sequential(
             nn.LayerNorm(d_model),
             nn.Dropout(dropout),
@@ -368,7 +384,7 @@ def main() -> int:
     )
     criterion = nn.CrossEntropyLoss()
     use_amp = device.type == "cuda"
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     checkpoint_path = args.output_dir / "best.pt"
     history = []
     best_uar, best_loss, stale_epochs = -math.inf, math.inf, 0
