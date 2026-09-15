@@ -87,6 +87,13 @@ batches per epoch for two epochs for both B1/context (clips I--II) and B2/full
 (clips I--III). The smoke test validates training, checkpointing, and artifact
 generation; its metrics are not research results. Test evaluation is disabled.
 
+## Validation-only pilot
+
+After the smoke test passes, run `experiments/kaggle_phase1_validation.ipynb`
+with a Kaggle T4 GPU. It trains the context and full models on all training
+samples for seed 42, selects checkpoints using validation only, and saves full
+validation logits. The notebook deliberately leaves the test split unevaluated.
+
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
