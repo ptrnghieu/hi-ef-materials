@@ -1,0 +1,163 @@
+{
+  "actual_sample_ratios": {
+    "test": 0.14452296819787985,
+    "train": 0.7042402826855124,
+    "val": 0.15123674911660778
+  },
+  "clip3_emotion_counts": {
+    "test": {
+      "angry": 94,
+      "disgust": 38,
+      "fear": 9,
+      "happy": 79,
+      "neutral": 83,
+      "sad": 59,
+      "surprise": 47
+    },
+    "train": {
+      "angry": 415,
+      "disgust": 159,
+      "fear": 22,
+      "happy": 425,
+      "neutral": 475,
+      "sad": 281,
+      "surprise": 216
+    },
+    "val": {
+      "angry": 90,
+      "disgust": 36,
+      "fear": 5,
+      "happy": 118,
+      "neutral": 88,
+      "sad": 53,
+      "surprise": 38
+    }
+  },
+  "clip4_emotion_counts": {
+    "test": {
+      "angry": 77,
+      "disgust": 40,
+      "fear": 6,
+      "happy": 100,
+      "neutral": 89,
+      "sad": 60,
+      "surprise": 37
+    },
+    "train": {
+      "angry": 363,
+      "disgust": 178,
+      "fear": 26,
+      "happy": 449,
+      "neutral": 485,
+      "sad": 296,
+      "surprise": 196
+    },
+    "val": {
+      "angry": 85,
+      "disgust": 42,
+      "fear": 6,
+      "happy": 113,
+      "neutral": 78,
+      "sad": 63,
+      "surprise": 41
+    }
+  },
+  "pairwise_leakage": {
+    "train-test": {
+      "shared_adjacent_pairs": 0,
+      "shared_clips": 0,
+      "shared_source_folders": 0
+    },
+    "train-val": {
+      "shared_adjacent_pairs": 0,
+      "shared_clips": 0,
+      "shared_source_folders": 0
+    },
+    "val-test": {
+      "shared_adjacent_pairs": 0,
+      "shared_clips": 0,
+      "shared_source_folders": 0
+    }
+  },
+  "passed": true,
+  "protocol": "source-folder-held-out",
+  "ratios": {
+    "test": 0.15,
+    "train": 0.7,
+    "val": 0.15
+  },
+  "sample_counts": {
+    "test": 409,
+    "train": 1993,
+    "val": 428
+  },
+  "search_restarts": 20000,
+  "seed": 42,
+  "source_folder_counts": {
+    "test": 8,
+    "train": 37,
+    "val": 8
+  },
+  "source_folder_semantics": "anonymized; likely episode-level proxy, awaiting author confirmation",
+  "source_folders": {
+    "test": [
+      "02",
+      "11",
+      "15",
+      "16",
+      "21",
+      "28",
+      "47",
+      "53"
+    ],
+    "train": [
+      "01",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "12",
+      "13",
+      "14",
+      "18",
+      "20",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "29",
+      "31",
+      "32",
+      "33",
+      "34",
+      "35",
+      "36",
+      "37",
+      "38",
+      "39",
+      "40",
+      "41",
+      "42",
+      "44",
+      "45",
+      "48",
+      "49",
+      "51",
+      "52"
+    ],
+    "val": [
+      "03",
+      "17",
+      "19",
+      "22",
+      "30",
+      "43",
+      "46",
+      "50"
+    ]
+  }
+}
