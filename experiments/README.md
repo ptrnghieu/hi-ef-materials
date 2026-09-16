@@ -162,3 +162,31 @@ The job records future-emotion and Party-A emotion metrics, full validation
 logits, configuration and code hashes, and a provisional selection using the
 predeclared rule. Advancement remains pending a separate hierarchical audit;
 the test partition stays unopened.
+
+The three-model matrix above is retained as an exploratory result; it is not
+the canonical architecture discussed for the follow-up method.
+
+## Canonical context-conditioned affective residual
+
+`experiments/RESEARCH_SPEC_v0.3.md` records the agreed architecture. The
+implementation is `experiments/train_contextual_affective_residual.py` and its
+contract tests are `experiments/test_contextual_affective_residual.py`.
+
+The runner implements the four required variants: `context`, `affect`,
+`interaction`, and `both`. For every example it saves `context_logits`,
+`delta_logits`, and `final_logits`, and enforces
+`final_logits = context_logits + delta_logits`. It also implements context,
+Party-A emotion, conditional supervised contrastive, null-consistency, and
+source-nuisance objectives. Test loading and evaluation are not implemented.
+
+Loss weights, contrastive temperature, and KL direction are required CLI
+arguments because those choices have not yet been frozen. Do not launch the
+canonical multi-seed experiment by copying weights from the earlier exploratory
+matrix.
+
+Run the architecture tests from the repository root:
+
+```bash
+PYTHONPATH=experiments python -m unittest \
+  experiments/test_contextual_affective_residual.py
+```
