@@ -190,3 +190,10 @@ Run the architecture tests from the repository root:
 PYTHONPATH=experiments python -m unittest \
   experiments/test_contextual_affective_residual.py
 ```
+
+Before freezing loss hyperparameters, run
+`experiments/kaggle_phase2_canonical_preflight.ipynb`. It invokes
+`experiments/run_canonical_preflight.py`, runs the contract tests, and performs
+one-epoch two-batch smoke runs for all four variants. The preflight uses unit
+weights solely to activate every loss path. Its metrics are explicitly marked
+as non-research outputs, and it never evaluates the test partition.

@@ -79,9 +79,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--contrastive-temperature", type=float, required=True)
     parser.add_argument(
         "--null-divergence",
-        choices=("context-to-null", "null-to-context", "symmetric"),
-        required=True,
-        help="KL direction; required because the discussion notes contain both directions.",
+        choices=("context-to-null",),
+        default="context-to-null",
+        help="Frozen teacher-student direction: stopgrad(context prior) to null-A prediction.",
     )
     parser.add_argument("--gradient-reversal-scale", type=float, default=1.0)
     parser.add_argument("--limit-train-batches", type=int)
@@ -339,22 +339,21 @@ def conditional_supervised_contrastive_loss(
 
 def null_consistency_loss(
     context_logits: torch.Tensor,
-    null_logits: torch.Tensor,
+    null_delta_logits: torch.Tensor,
     direction: str,
 ) -> torch.Tensor:
-    context_log = F.log_softmax(context_logits, dim=-1)
+    if direction != "context-to-null":
+        raise ValueError(f"Unsupported frozen null divergence: {direction}")
+    # The context prior is the teacher.  Detaching both its target probability
+    # and its contribution to the null prediction ensures L_null can only train
+    # the residual path toward Delta_A(null) = 0; it cannot weaken or move h_C.
+    context_reference = context_logits.detach()
+    null_logits = context_reference + null_delta_logits
+    context_log = F.log_softmax(context_reference, dim=-1)
     null_log = F.log_softmax(null_logits, dim=-1)
     context_probability = context_log.exp()
-    null_probability = null_log.exp()
     context_to_null = F.kl_div(null_log, context_probability, reduction="batchmean")
-    null_to_context = F.kl_div(context_log, null_probability, reduction="batchmean")
-    if direction == "context-to-null":
-        return context_to_null
-    if direction == "null-to-context":
-        return null_to_context
-    if direction == "symmetric":
-        return 0.5 * (context_to_null + null_to_context)
-    raise ValueError(f"Unknown null divergence: {direction}")
+    return context_to_null
 
 
 def compute_losses(
@@ -388,7 +387,7 @@ def compute_losses(
         nuisance = F.cross_entropy(output["nuisance_logits"], nuisance_target)
     if variant != "context":
         null = null_consistency_loss(
-            output["context_logits"], output["null_logits"], null_divergence
+            output["context_logits"], output["null_delta_logits"], null_divergence
         )
     total = (
         final
@@ -619,7 +618,7 @@ def main() -> int:
         writer.writerows(history)
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint["model_state"])
-    validation = evaluate(model, val_loader, device)
+    validation = evaluate(model, val_loader, device, args.limit_val_batches)
     save_predictions(args.output_dir / "val_predictions.npz", validation)
     metrics = {
         "protocol": "contextual-affective-residual-validation-v1",

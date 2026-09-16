@@ -88,7 +88,7 @@ class CanonicalArchitectureTests(unittest.TestCase):
             {"context": 1.0, "emotion": 1.0, "contrastive": 1.0,
              "null": 1.0, "nuisance": 1.0},
             0.1,
-            "symmetric",
+            "context-to-null",
         )
         self.assertEqual(
             set(losses),
@@ -106,13 +106,27 @@ class CanonicalArchitectureTests(unittest.TestCase):
         loss.backward()
         self.assertIsNotNone(representations.grad)
 
-    def test_null_divergence_is_zero_for_identical_logits(self) -> None:
-        logits = torch.randn(5, 7)
-        for direction in ("context-to-null", "null-to-context", "symmetric"):
-            with self.subTest(direction=direction):
-                self.assertAlmostEqual(
-                    float(null_consistency_loss(logits, logits, direction)), 0.0, places=6
-                )
+    def test_null_divergence_is_zero_for_zero_delta(self) -> None:
+        context_logits = torch.randn(5, 7)
+        null_delta = torch.zeros_like(context_logits)
+        self.assertAlmostEqual(
+            float(null_consistency_loss(
+                context_logits, null_delta, "context-to-null"
+            )),
+            0.0,
+            places=6,
+        )
+
+    def test_null_loss_detaches_context_teacher(self) -> None:
+        context_logits = torch.randn(5, 7, requires_grad=True)
+        null_delta = torch.randn(5, 7, requires_grad=True)
+        loss = null_consistency_loss(
+            context_logits, null_delta, "context-to-null"
+        )
+        loss.backward()
+        self.assertIsNone(context_logits.grad)
+        self.assertIsNotNone(null_delta.grad)
+        self.assertGreater(float(null_delta.grad.abs().sum()), 0.0)
 
 
 if __name__ == "__main__":

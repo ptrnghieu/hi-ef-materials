@@ -1,6 +1,7 @@
 # Hi-EF follow-up study: canonical method specification v0.3
 
-Status: architecture frozen; loss hyperparameters not yet frozen. Test remains unopened.
+Status: architecture and null-loss direction frozen; remaining loss
+hyperparameters not yet frozen. Test remains unopened.
 
 ## Research question
 
@@ -49,9 +50,15 @@ Conditional contrastive pairs use same-emotion/different-source positives and
 different-emotion/same-source negatives. Source folder is only an anonymized
 proxy; claims about scene or identity invariance are not permitted.
 
-The discussion contains both KL directions for `L_null`. The runner therefore
-requires the direction to be explicitly frozen as `context-to-null`,
-`null-to-context`, or `symmetric`; it does not choose one silently.
+The null objective is frozen as a teacher--student constraint:
+
+```text
+L_null = KL(stopgrad(p_C) || p_C,A_null)
+```
+
+The context contribution to the null prediction is also detached inside this
+loss. Therefore `L_null` can train only the residual path toward
+`Delta_A(null) = 0`; it cannot move or weaken the context prior.
 
 ## Required ablations
 
@@ -83,7 +90,6 @@ this specification.
 
 - `lambda_C`, `lambda_E`, `lambda_con`, `lambda_null`, and `lambda_N`;
 - contrastive temperature;
-- null-divergence direction;
 - whether the context branch is jointly trained throughout or pretrained and
   then frozen (an ablation discussed but not decided).
 
