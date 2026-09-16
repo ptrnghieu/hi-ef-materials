@@ -207,3 +207,13 @@ every run, checks the logit-addition invariant, and emits one JSON summary plus
 one CSV table. It never loads test rows. Matrix results are descriptive only;
 method advancement remains blocked until a separately frozen hierarchical
 validation audit is completed.
+
+`experiments/RESEARCH_SPEC_v0.5.md` freezes that audit before it is run. Attach
+the saved canonical-matrix notebook output to
+`experiments/kaggle_phase2_canonical_audit.ipynb` and run the notebook on CPU.
+The audit recomputes paired UAR and NLL under 5,000 hierarchical bootstrap
+replicates over model seeds and validation source folders. It writes an audit
+summary, per-seed effects, and per-class recall effects. The canonical `both`
+variant may advance to one test evaluation only if both predeclared primary UAR
+intervals have lower bounds above zero; complementarity claims are assessed
+separately. The audit does not load test rows.
