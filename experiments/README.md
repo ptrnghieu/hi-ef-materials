@@ -147,3 +147,18 @@ validation diagnostics rather than confirmatory test estimates.
 The runner supports `--face-pooling masked` (corrected primary setting) and
 `--face-pooling unmasked` (compatibility diagnostic). With masked pooling,
 center-crop fallbacks are excluded according to `face_valid_mask`.
+
+## Phase 2 affective method development
+
+`experiments/RESEARCH_SPEC_v0.2.md` freezes the research question, evidence,
+hypotheses, method candidates, selection rule, stopping rule, and permitted
+claims before method results are observed.
+
+Run `experiments/kaggle_phase2_affective_method_matrix.ipynb` with the feature
+dataset and saved canonical baseline output. It trains `full_aux`,
+`affective_bottleneck`, and `hybrid_residual` across all five fixed seeds in one
+validation-only job. A runtime forward/backward preflight runs before training.
+The job records future-emotion and Party-A emotion metrics, full validation
+logits, configuration and code hashes, and a provisional selection using the
+predeclared rule. Advancement remains pending a separate hierarchical audit;
+the test partition stays unopened.
