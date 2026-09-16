@@ -6,8 +6,8 @@ This runner is validation-only.  It implements the agreed architecture
     final_logits = context_logits + delta_A(context, Party-A representations)
 
 and the four required ablations: context, affect, interaction, and both.
-Loss weights are intentionally required command-line arguments: they were not
-fixed by the research discussion and must not be selected silently in code.
+The experiment matrix supplies the loss weights frozen in research protocol
+v0.4.  This lower-level runner keeps them explicit in every saved run config.
 """
 
 from __future__ import annotations
@@ -296,6 +296,43 @@ def source_labels(source_folders: list[str], mapping: dict[str, int], device: to
     return torch.tensor(labels, dtype=torch.long, device=device)
 
 
+def balanced_affect_weights(train_rows: pd.DataFrame) -> np.ndarray:
+    """Compute mean-one inverse-frequency weights from training labels only."""
+    counts = (
+        train_rows["clip3_emotion"]
+        .value_counts()
+        .reindex(EMOTIONS, fill_value=0)
+        .to_numpy(dtype=float)
+    )
+    if np.any(counts == 0):
+        raise RuntimeError(f"Training partition lacks a Party-A emotion class: {counts}")
+    weights = len(train_rows) / (len(EMOTIONS) * counts)
+    return weights / weights.mean()
+
+
+def conditional_contrastive_masks(
+    emotion_labels: torch.Tensor,
+    source_folders: list[str],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Return positive, negative, and valid-anchor masks for conditional SupCon."""
+    batch_size = emotion_labels.size(0)
+    source_codes = {
+        folder: index for index, folder in enumerate(sorted(set(source_folders)))
+    }
+    source = torch.tensor(
+        [source_codes[folder] for folder in source_folders],
+        dtype=torch.long,
+        device=emotion_labels.device,
+    )
+    identity = torch.eye(batch_size, dtype=torch.bool, device=emotion_labels.device)
+    same_emotion = emotion_labels[:, None].eq(emotion_labels[None, :])
+    same_source = source[:, None].eq(source[None, :])
+    positives = same_emotion & ~same_source & ~identity
+    negatives = ~same_emotion & same_source & ~identity
+    valid = positives.any(dim=1) & negatives.any(dim=1)
+    return positives, negatives, valid
+
+
 def conditional_supervised_contrastive_loss(
     representations: torch.Tensor,
     emotion_labels: torch.Tensor,
@@ -313,19 +350,10 @@ def conditional_supervised_contrastive_loss(
     batch_size = representations.size(0)
     if batch_size < 2:
         return representations.sum() * 0.0
-    source_codes = {folder: index for index, folder in enumerate(sorted(set(source_folders)))}
-    source = torch.tensor(
-        [source_codes[folder] for folder in source_folders],
-        dtype=torch.long,
-        device=representations.device,
+    positives, negatives, valid = conditional_contrastive_masks(
+        emotion_labels, source_folders
     )
-    identity = torch.eye(batch_size, dtype=torch.bool, device=representations.device)
-    same_emotion = emotion_labels[:, None].eq(emotion_labels[None, :])
-    same_source = source[:, None].eq(source[None, :])
-    positives = same_emotion & ~same_source & ~identity
-    negatives = ~same_emotion & same_source & ~identity
     candidates = positives | negatives
-    valid = positives.any(dim=1) & negatives.any(dim=1)
     if not valid.any():
         return representations.sum() * 0.0
     normalized = F.normalize(representations, dim=-1)
@@ -362,6 +390,7 @@ def compute_losses(
     variant: str,
     source_mapping: dict[str, int],
     weights: dict[str, float],
+    affect_class_weights: torch.Tensor,
     temperature: float,
     null_divergence: str,
 ) -> dict[str, torch.Tensor]:
@@ -373,8 +402,17 @@ def compute_losses(
     contrastive = zero
     nuisance = zero
     null = zero
+    contrastive_valid_anchor_rate = zero
     if variant in {"affect", "both"}:
-        emotion = F.cross_entropy(output["affect_logits"], batch["party_a_target"])
+        emotion = F.cross_entropy(
+            output["affect_logits"],
+            batch["party_a_target"],
+            weight=affect_class_weights,
+        )
+        _, _, valid_anchors = conditional_contrastive_masks(
+            batch["party_a_target"], batch["source_folder"]
+        )
+        contrastive_valid_anchor_rate = valid_anchors.float().mean()
         contrastive = conditional_supervised_contrastive_loss(
             output["affect_representation"],
             batch["party_a_target"],
@@ -405,6 +443,7 @@ def compute_losses(
         "contrastive": contrastive,
         "null": null,
         "nuisance": nuisance,
+        "contrastive_valid_anchor_rate": contrastive_valid_anchor_rate,
     }
 
 
@@ -452,6 +491,22 @@ def evaluate(
     }
     result.update({f"final_{key}": value for key, value in final_metrics.items()})
     result.update({f"context_{key}": value for key, value in context_metrics.items()})
+    if getattr(model, "variant", None) in {"affect", "both"}:
+        affect_metrics = metrics_from_logits(
+            merged["affect_logits"], merged["party_a_labels"]
+        )
+        result["affect_unweighted_loss"] = float(F.cross_entropy(
+            torch.from_numpy(merged["affect_logits"]),
+            torch.from_numpy(merged["party_a_labels"]),
+        ))
+        result.update({f"affect_{key}": value for key, value in affect_metrics.items()})
+    else:
+        result.update({
+            "affect_unweighted_loss": None,
+            "affect_uar": None,
+            "affect_war": None,
+            "affect_per_class_recall": None,
+        })
     return result
 
 
@@ -495,6 +550,10 @@ def main() -> int:
         folder: index
         for index, folder in enumerate(sorted(train_rows["source_folder"].unique()))
     }
+    affect_weights_array = balanced_affect_weights(train_rows)
+    affect_class_weights = torch.tensor(
+        affect_weights_array, dtype=torch.float32, device=device
+    )
     train_loader = build_loader(
         train_rows, args.features_dir, args.batch_size, args.workers, True, args.seed
     )
@@ -526,6 +585,11 @@ def main() -> int:
         "manifest_sha256": sha256(args.manifest),
         "test_evaluation_requested": False,
         "architecture_invariant": "final_logits=context_logits+delta_logits",
+        "affect_class_weighting": "training-only-mean-one-inverse-frequency",
+        "affect_class_weights": {
+            emotion: float(weight)
+            for emotion, weight in zip(EMOTIONS, affect_weights_array)
+        },
     }
     (args.output_dir / "config.json").write_text(
         json.dumps(config, indent=2, sort_keys=True) + "\n"
@@ -547,7 +611,8 @@ def main() -> int:
     for epoch in range(1, args.epochs + 1):
         model.train()
         sums = {name: 0.0 for name in (
-            "total", "final", "context", "emotion", "contrastive", "null", "nuisance"
+            "total", "final", "context", "emotion", "contrastive", "null", "nuisance",
+            "contrastive_valid_anchor_rate",
         )}
         seen = 0
         for batch_index, batch in enumerate(train_loader):
@@ -559,7 +624,8 @@ def main() -> int:
                 output = model(device_batch)
                 losses = compute_losses(
                     output, device_batch, args.variant, source_mapping, weights,
-                    args.contrastive_temperature, args.null_divergence,
+                    affect_class_weights, args.contrastive_temperature,
+                    args.null_divergence,
                 )
             if not torch.isfinite(losses["total"]):
                 raise RuntimeError(f"Non-finite loss at epoch {epoch}, batch {batch_index}")
@@ -576,13 +642,20 @@ def main() -> int:
         scheduler.step(validation["final_loss"])
         row = {
             "epoch": epoch,
-            **{f"train_{name}_loss": total / seen for name, total in sums.items()},
+            **{
+                (f"train_{name}" if name == "contrastive_valid_anchor_rate"
+                 else f"train_{name}_loss"): total / seen
+                for name, total in sums.items()
+            },
             "val_final_loss": validation["final_loss"],
             "val_final_uar": validation["final_uar"],
             "val_final_war": validation["final_war"],
             "val_context_loss": validation["context_loss"],
             "val_context_uar": validation["context_uar"],
             "val_delta_l2_mean": validation["delta_l2_mean"],
+            "val_affect_unweighted_loss": validation["affect_unweighted_loss"],
+            "val_affect_uar": validation["affect_uar"],
+            "val_affect_war": validation["affect_war"],
             "learning_rate": optimizer.param_groups[0]["lr"],
         }
         history.append(row)

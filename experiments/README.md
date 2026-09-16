@@ -179,10 +179,12 @@ The runner implements the four required variants: `context`, `affect`,
 Party-A emotion, conditional supervised contrastive, null-consistency, and
 source-nuisance objectives. Test loading and evaluation are not implemented.
 
-Loss weights, contrastive temperature, and KL direction are required CLI
-arguments because those choices have not yet been frozen. Do not launch the
-canonical multi-seed experiment by copying weights from the earlier exploratory
-matrix.
+`experiments/RESEARCH_SPEC_v0.4.md` additionally freezes all loss weights,
+contrastive temperature, joint end-to-end training, optimization settings, and
+the five model seeds before full training. Party-A emotion CE uses class weights
+computed only from training labels. The trainer logs Party-A affect metrics,
+every loss component, conditional-SupCon valid-anchor coverage, context/final
+metrics, and residual norm.
 
 Run the architecture tests from the repository root:
 
@@ -197,3 +199,11 @@ Before freezing loss hyperparameters, run
 one-epoch two-batch smoke runs for all four variants. The preflight uses unit
 weights solely to activate every loss path. Its metrics are explicitly marked
 as non-research outputs, and it never evaluates the test partition.
+
+After the preflight passes, run
+`experiments/kaggle_phase2_canonical_matrix.ipynb`. Its single runner invocation
+executes the frozen 4 variants by 5 seeds matrix, validates or safely resumes
+every run, checks the logit-addition invariant, and emits one JSON summary plus
+one CSV table. It never loads test rows. Matrix results are descriptive only;
+method advancement remains blocked until a separately frozen hierarchical
+validation audit is completed.

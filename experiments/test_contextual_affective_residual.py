@@ -4,6 +4,7 @@ import torch
 
 from train_contextual_affective_residual import (
     ContextualAffectiveResidual,
+    balanced_affect_weights,
     compute_losses,
     conditional_supervised_contrastive_loss,
     null_consistency_loss,
@@ -87,12 +88,14 @@ class CanonicalArchitectureTests(unittest.TestCase):
             {"01": 0, "02": 1},
             {"context": 1.0, "emotion": 1.0, "contrastive": 1.0,
              "null": 1.0, "nuisance": 1.0},
+            torch.ones(7),
             0.1,
             "context-to-null",
         )
         self.assertEqual(
             set(losses),
-            {"total", "final", "context", "emotion", "contrastive", "null", "nuisance"},
+            {"total", "final", "context", "emotion", "contrastive", "null", "nuisance",
+             "contrastive_valid_anchor_rate"},
         )
         self.assertTrue(all(torch.isfinite(loss) for loss in losses.values()))
 
@@ -105,6 +108,18 @@ class CanonicalArchitectureTests(unittest.TestCase):
         self.assertGreaterEqual(float(loss), 0.0)
         loss.backward()
         self.assertIsNotNone(representations.grad)
+
+    def test_balanced_affect_weights_use_training_counts_only(self) -> None:
+        import pandas as pd
+
+        rows = pd.DataFrame({
+            "clip3_emotion": [emotion for emotion in (
+                "angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"
+            ) for _ in range(2)] + ["angry", "angry"]
+        })
+        weights = balanced_affect_weights(rows)
+        self.assertAlmostEqual(float(weights.mean()), 1.0)
+        self.assertLess(float(weights[0]), float(weights[1]))
 
     def test_null_divergence_is_zero_for_zero_delta(self) -> None:
         context_logits = torch.randn(5, 7)
