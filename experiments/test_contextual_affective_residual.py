@@ -58,6 +58,21 @@ class CanonicalArchitectureTests(unittest.TestCase):
         )
         torch.testing.assert_close(output["final_logits"], output["context_logits"])
 
+    def test_both_checkpoint_branch_interventions_share_one_model(self) -> None:
+        model = self.build_model("both").eval()
+        batch = synthetic_batch()
+        with torch.no_grad():
+            ordinary = model(batch)
+            interventions = model.intervention_logits(batch)
+        torch.testing.assert_close(interventions["context"], ordinary["context_logits"])
+        torch.testing.assert_close(interventions["both"], ordinary["final_logits"])
+        self.assertEqual(
+            set(interventions),
+            {"context", "affect_only", "interaction_only", "both"},
+        )
+        for logits in interventions.values():
+            self.assertEqual(tuple(logits.shape), (4, 7))
+
     def test_null_delta_depends_only_on_context_and_zero_a(self) -> None:
         model = self.build_model("both").eval()
         batch = synthetic_batch()

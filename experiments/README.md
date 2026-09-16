@@ -217,3 +217,11 @@ summary, per-seed effects, and per-class recall effects. The canonical `both`
 variant may advance to one test evaluation only if both predeclared primary UAR
 intervals have lower bounds above zero; complementarity claims are assessed
 separately. The audit does not load test rows.
+
+Because the v0.5 advancement gate failed, do not evaluate test. Phase-1 failure
+diagnostics are frozen in `experiments/RESEARCH_SPEC_v0.6.md` and run through
+`experiments/kaggle_phase1_post_audit_diagnostics.ipynb`. Attach the canonical
+matrix output and frozen feature dataset. The job computes calibration and
+residual diagnostics and evaluates `context`, `affect_only`,
+`interaction_only`, and `both` inside each saved `both` checkpoint. It performs
+no training or model selection and reads validation only.

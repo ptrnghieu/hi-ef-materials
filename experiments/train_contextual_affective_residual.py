@@ -287,6 +287,33 @@ class ContextualAffectiveResidual(nn.Module):
             "nuisance_logits": nuisance_logits,
         }
 
+    def intervention_logits(
+        self, batch: dict[str, object]
+    ) -> dict[str, torch.Tensor]:
+        """Ablate Party-A branches inside one trained `both` checkpoint.
+
+        This diagnostic method adds no parameters and does not change the
+        training forward pass.  Context-only bypasses the residual head;
+        single-branch conditions zero the other learned representation while
+        keeping the same context, encoder, and residual head.
+        """
+        if self.variant != "both":
+            raise ValueError("Branch interventions require a `both` checkpoint")
+        output = self.forward(batch)
+        context = output["context_representation"]
+        affect = output["affect_representation"]
+        interaction = output["interaction_representation"]
+        zero = torch.zeros_like(affect)
+        context_logits = output["context_logits"]
+        return {
+            "context": context_logits,
+            "affect_only": context_logits + self._residual(context, affect, zero),
+            "interaction_only": context_logits + self._residual(
+                context, zero, interaction
+            ),
+            "both": output["final_logits"],
+        }
+
 
 def source_labels(source_folders: list[str], mapping: dict[str, int], device: torch.device) -> torch.Tensor:
     try:
