@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train the frozen v0.8 reliability-gated residual inner-development model."""
+"""Train the frozen v0.9 relative-reliability inner-development model."""
 
 from __future__ import annotations
 
@@ -25,15 +25,19 @@ from train_contextual_affective_residual import (
 )
 
 
-VARIANTS = ("ungated", "gate", "counterfactual", "gate_counterfactual")
+VARIANTS = ("ungated", "relative_gate", "relative_gate_cf")
 
 
 def uses_gate(variant: str) -> bool:
-    return variant in {"gate", "gate_counterfactual"}
+    return variant in {"relative_gate", "relative_gate_cf"}
 
 
 def uses_counterfactual(variant: str) -> bool:
-    return variant in {"counterfactual", "gate_counterfactual"}
+    return variant == "relative_gate_cf"
+
+
+def uses_relative_ranking(variant: str) -> bool:
+    return variant in {"relative_gate", "relative_gate_cf"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +64,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--null-weight", type=float, required=True)
     parser.add_argument("--nuisance-weight", type=float, required=True)
     parser.add_argument("--counterfactual-weight", type=float, required=True)
-    parser.add_argument("--invalid-gate-weight", type=float, required=True)
+    parser.add_argument("--ranking-weight", type=float, required=True)
+    parser.add_argument("--ranking-margin", type=float, required=True)
     parser.add_argument("--contrastive-temperature", type=float, required=True)
     parser.add_argument("--null-divergence", choices=("context-to-null",), required=True)
     parser.add_argument("--gradient-reversal-scale", type=float, default=1.0)
@@ -200,11 +205,13 @@ def context_consistency_loss(
     return F.kl_div(F.log_softmax(alternative_logits, dim=-1), probability, reduction="batchmean")
 
 
-def invalid_gate_zero_loss(gate_logit: torch.Tensor) -> torch.Tensor:
-    """AMP-safe binary loss for the pre-sigmoid invalid-A gate logit."""
-    return F.binary_cross_entropy_with_logits(
-        gate_logit, torch.zeros_like(gate_logit)
-    )
+def relative_gate_ranking_loss(
+    real_gate: torch.Tensor,
+    counterfactual_gate: torch.Tensor,
+    margin: float,
+) -> torch.Tensor:
+    """Require aligned evidence to rank above counterfactual evidence."""
+    return F.relu(margin - real_gate.float() + counterfactual_gate.float()).mean()
 
 
 def compute_reliability_losses(
@@ -216,6 +223,7 @@ def compute_reliability_losses(
     affect_class_weights: torch.Tensor,
     temperature: float,
     null_divergence: str,
+    ranking_margin: float,
 ) -> dict[str, torch.Tensor]:
     base = compute_losses(
         output,
@@ -229,22 +237,24 @@ def compute_reliability_losses(
     )
     zero = output["final_logits"].sum() * 0.0
     counterfactual = zero
-    invalid_gate = zero
-    if model.counterfactual_training:
+    ranking = zero
+    if uses_relative_ranking(model.variant):
         invalid = model.invalid_party_a(output)
-        counterfactual = context_consistency_loss(
-            output["context_logits"], invalid["invalid_logits"]
+        ranking = relative_gate_ranking_loss(
+            output["reliability_gate"],
+            invalid["invalid_reliability_gate"],
+            ranking_margin,
         )
-        if model.gated:
-            invalid_gate = invalid_gate_zero_loss(
-                invalid["invalid_reliability_logit"]
+        if model.counterfactual_training:
+            counterfactual = context_consistency_loss(
+                output["context_logits"], invalid["invalid_logits"]
             )
     total = (
         base["total"]
         + weights["counterfactual"] * counterfactual
-        + weights["invalid_gate"] * invalid_gate
+        + weights["ranking"] * ranking
     )
-    return {**base, "counterfactual": counterfactual, "invalid_gate": invalid_gate, "total": total}
+    return {**base, "counterfactual": counterfactual, "ranking": ranking, "total": total}
 
 
 @torch.no_grad()
@@ -257,7 +267,7 @@ def evaluate(
     model.eval()
     keys = (
         "context_logits", "raw_delta_logits", "delta_logits", "final_logits",
-        "reliability_gate", "affect_logits",
+        "reliability_gate", "invalid_reliability_gate", "affect_logits",
     )
     arrays: dict[str, list[np.ndarray]] = {key: [] for key in keys}
     arrays.update({"labels": [], "party_a_labels": []})
@@ -268,6 +278,8 @@ def evaluate(
             break
         device_batch = to_device(batch, device)
         output = model(device_batch)
+        invalid = model.invalid_party_a(output)
+        output["invalid_reliability_gate"] = invalid["invalid_reliability_gate"]
         for key in keys:
             arrays[key].append(output[key].cpu().numpy())
         arrays["labels"].append(device_batch["target"].cpu().numpy())
@@ -283,6 +295,7 @@ def evaluate(
     context_correct = context_prediction == labels
     final_correct = final_prediction == labels
     gate = merged["reliability_gate"].reshape(-1)
+    invalid_gate = merged["invalid_reliability_gate"].reshape(-1)
     result: dict[str, object] = {
         **merged,
         "sample_ids": np.asarray(sample_ids),
@@ -296,6 +309,8 @@ def evaluate(
         "gate_p10": float(np.quantile(gate, 0.10)),
         "gate_p50": float(np.quantile(gate, 0.50)),
         "gate_p90": float(np.quantile(gate, 0.90)),
+        "invalid_gate_mean": float(invalid_gate.mean()),
+        "gate_separation_mean": float((gate - invalid_gate).mean()),
         "prediction_flip_rate": float(np.mean(context_prediction != final_prediction)),
         "beneficial_flip_rate": float(np.mean(~context_correct & final_correct)),
         "harmful_flip_rate": float(np.mean(context_correct & ~final_correct)),
@@ -313,7 +328,8 @@ def evaluate(
 def public_metrics(result: dict[str, object]) -> dict[str, object]:
     hidden = {
         "context_logits", "raw_delta_logits", "delta_logits", "final_logits",
-        "reliability_gate", "affect_logits", "labels", "party_a_labels",
+        "reliability_gate", "invalid_reliability_gate", "affect_logits",
+        "labels", "party_a_labels",
         "sample_ids", "source_folders",
     }
     return {key: value for key, value in result.items() if key not in hidden}
@@ -323,7 +339,8 @@ def save_predictions(path: Path, result: dict[str, object]) -> None:
     np.savez_compressed(path, **{
         key: result[key] for key in (
             "context_logits", "raw_delta_logits", "delta_logits", "final_logits",
-            "reliability_gate", "affect_logits", "labels", "party_a_labels",
+            "reliability_gate", "invalid_reliability_gate", "affect_logits",
+            "labels", "party_a_labels",
             "sample_ids", "source_folders",
         )
     })
@@ -333,14 +350,16 @@ def main() -> int:
     args = parse_args()
     nonnegative = (
         "context_weight", "emotion_weight", "contrastive_weight", "null_weight",
-        "nuisance_weight", "counterfactual_weight", "invalid_gate_weight",
+        "nuisance_weight", "counterfactual_weight", "ranking_weight",
     )
     for name in nonnegative:
         if getattr(args, name) < 0:
             raise ValueError(f"{name} must be non-negative")
     manifest = pd.read_csv(args.manifest, dtype={"source_folder": str})
     if set(manifest["split"]) != {"inner_train", "inner_development"}:
-        raise RuntimeError("v0.8 trainer accepts only the frozen inner-development manifest")
+        raise RuntimeError("v0.9 trainer accepts only the frozen inner-development manifest")
+    if not 0.0 < args.ranking_margin < 1.0:
+        raise ValueError("ranking_margin must be between zero and one")
     if "original_split" not in manifest or set(manifest["original_split"]) != {"train"}:
         raise RuntimeError("Inner manifest must prove every row came from original train")
     train_rows = manifest[manifest["split"] == "inner_train"].reset_index(drop=True)
@@ -370,7 +389,7 @@ def main() -> int:
         "null": args.null_weight,
         "nuisance": args.nuisance_weight,
         "counterfactual": args.counterfactual_weight,
-        "invalid_gate": args.invalid_gate_weight,
+        "ranking": args.ranking_weight,
     }
     config = {
         **{key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
@@ -383,7 +402,8 @@ def main() -> int:
         "test_evaluated": False,
         "architecture_invariant": "final_logits=context_logits+reliability_gate*raw_delta_logits",
         "invalid_party_a": "cyclic-one-position-roll; singleton-zero",
-        "positive_gate_targets_used": False,
+        "absolute_gate_targets_used": False,
+        "relative_gate_ranking": "relu(margin-real_gate+counterfactual_gate)",
         "affect_class_weights": {
             emotion: float(weight) for emotion, weight in zip(EMOTIONS, affect_weights_array)
         },
@@ -396,7 +416,7 @@ def main() -> int:
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     loss_names = (
         "total", "final", "context", "emotion", "contrastive", "null", "nuisance",
-        "counterfactual", "invalid_gate", "contrastive_valid_anchor_rate",
+        "counterfactual", "ranking", "contrastive_valid_anchor_rate",
     )
     history: list[dict[str, object]] = []
     best_uar, best_loss, stale = -math.inf, math.inf, 0
@@ -415,6 +435,7 @@ def main() -> int:
                 losses = compute_reliability_losses(
                     model, output, device_batch, source_mapping, weights, affect_weights,
                     args.contrastive_temperature, args.null_divergence,
+                    args.ranking_margin,
                 )
             if not torch.isfinite(losses["total"]):
                 raise RuntimeError(f"Non-finite loss at epoch {epoch}, batch {batch_index}")
@@ -435,7 +456,7 @@ def main() -> int:
             **{f"val_{name}": validation[name] for name in (
                 "final_loss", "final_uar", "final_war", "context_loss", "context_uar",
                 "raw_delta_l2_mean", "delta_l2_mean", "gate_mean", "harmful_flip_rate",
-                "beneficial_flip_rate", "affect_uar",
+                "beneficial_flip_rate", "gate_separation_mean", "affect_uar",
             )},
             "learning_rate": optimizer.param_groups[0]["lr"],
         }
@@ -464,7 +485,7 @@ def main() -> int:
     validation = evaluate(model, val_loader, device, args.limit_val_batches)
     save_predictions(args.output_dir / "inner_development_predictions.npz", validation)
     metrics = {
-        "protocol": "reliability-gated-residual-inner-development-v1",
+        "protocol": "relative-reliability-inner-development-v1",
         "variant": args.variant,
         "best_epoch": checkpoint["epoch"],
         "inner_development": public_metrics(validation),

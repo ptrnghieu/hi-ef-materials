@@ -239,13 +239,15 @@ checkpoints, select a model, or access test. Its results determine whether the
 next predeclared experiment should target global calibration, residual
 shrinkage, or sample-conditioned reliability.
 
-## Reliability-gated residual inner development
+## Relative-reliability inner development
 
-The v0.7 diagnostic motivated sample-conditioned reliability rather than a
-single global multiplier. `experiments/RESEARCH_SPEC_v0.8.md` freezes the next
-experiment before training. It retains the agreed context-conditioned
-affective-residual hypothesis and tests a 2×2 matrix: `ungated`, `gate`,
-`counterfactual`, and `gate_counterfactual`.
+The v0.8 absolute invalid-gate objective collapsed the candidate gate to almost
+zero. `experiments/RESEARCH_SPEC_v0.9.md` records that result and freezes the
+final reliability-development round before execution. It retains the agreed
+context-conditioned affective-residual hypothesis and compares `ungated`,
+`relative_gate`, and the sole candidate `relative_gate_cf`. The learned cells
+rank aligned Party-A evidence above an in-batch counterfactual instead of
+assigning absolute gate targets.
 
 The committed `manifests/inner_development_seed8042.csv` is built exclusively
 from the 1,993 original training rows. Its 29 inner-training and 8
@@ -268,8 +270,9 @@ PYTHONPATH=experiments python -m unittest \
 
 Run `experiments/kaggle_phase2_reliability_inner_matrix.ipynb` with the frozen
 feature dataset and a T4 GPU. The runner executes PyTorch contract tests before
-training all four cells for seeds 42, 123, and 456. It saves raw and effective
-residuals, scalar reliability gates, aligned logits, per-seed metrics, and the
-predeclared advancement-gate decision. A passing candidate may only proceed to
-a separately frozen five-seed original-validation audit; this job cannot open
-original validation or test.
+training all three cells for seeds 42, 123, and 456. It saves raw and effective
+residuals, real and counterfactual gates, aligned logits, per-seed metrics, a
+5,000-replicate paired hierarchical bootstrap, and the predeclared advancement
+decision. A passing candidate may only proceed to a separately frozen
+five-seed original-validation audit; this job cannot open original validation
+or test. Failure ends learned-gate development under this plan.
