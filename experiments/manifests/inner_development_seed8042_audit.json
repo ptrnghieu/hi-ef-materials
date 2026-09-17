@@ -1,0 +1,89 @@
+{
+  "allocation_cost": 0.04047058139017627,
+  "clip4_emotion_counts": {
+    "inner_development": {
+      "angry": 78,
+      "disgust": 40,
+      "fear": 6,
+      "happy": 100,
+      "neutral": 108,
+      "sad": 60,
+      "surprise": 44
+    },
+    "inner_train": {
+      "angry": 285,
+      "disgust": 138,
+      "fear": 20,
+      "happy": 349,
+      "neutral": 377,
+      "sad": 236,
+      "surprise": 152
+    }
+  },
+  "eligible_original_split": "train",
+  "optimizer_restarts": 50000,
+  "original_test_rows_included": 0,
+  "original_validation_rows_included": 0,
+  "pairwise_disjointness": {
+    "shared_adjacent_pairs": 0,
+    "shared_clips": 0,
+    "shared_sample_ids": 0,
+    "shared_source_folders": 0
+  },
+  "passed": true,
+  "protocol": "original-train-source-folder-inner-development-v1",
+  "sample_counts": {
+    "inner_development": 436,
+    "inner_train": 1557
+  },
+  "seed": 8042,
+  "source_folder_counts": {
+    "inner_development": 8,
+    "inner_train": 29
+  },
+  "source_folders": {
+    "inner_development": [
+      "07",
+      "09",
+      "14",
+      "20",
+      "27",
+      "29",
+      "36",
+      "52"
+    ],
+    "inner_train": [
+      "01",
+      "04",
+      "05",
+      "06",
+      "08",
+      "10",
+      "12",
+      "13",
+      "18",
+      "23",
+      "24",
+      "25",
+      "26",
+      "31",
+      "32",
+      "33",
+      "34",
+      "35",
+      "37",
+      "38",
+      "39",
+      "40",
+      "41",
+      "42",
+      "44",
+      "45",
+      "48",
+      "49",
+      "51"
+    ]
+  },
+  "source_manifest": "experiments/manifests/source_folder_split_seed42.csv",
+  "source_manifest_sha256": "f333dde1b4cddea64c229dc00e94aa90df36324a27a6bc89fbe30b256bcbcd33"
+}

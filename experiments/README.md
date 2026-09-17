@@ -238,3 +238,38 @@ label-informed oracle selectors only as upper bounds. The job does not train
 checkpoints, select a model, or access test. Its results determine whether the
 next predeclared experiment should target global calibration, residual
 shrinkage, or sample-conditioned reliability.
+
+## Reliability-gated residual inner development
+
+The v0.7 diagnostic motivated sample-conditioned reliability rather than a
+single global multiplier. `experiments/RESEARCH_SPEC_v0.8.md` freezes the next
+experiment before training. It retains the agreed context-conditioned
+affective-residual hypothesis and tests a 2×2 matrix: `ungated`, `gate`,
+`counterfactual`, and `gate_counterfactual`.
+
+The committed `manifests/inner_development_seed8042.csv` is built exclusively
+from the 1,993 original training rows. Its 29 inner-training and 8
+inner-development source folders are disjoint; no original validation or test
+row is present. Rebuild and audit it with:
+
+```bash
+python experiments/build_inner_development_split.py \
+  --manifest experiments/manifests/source_folder_split_seed42.csv \
+  --output-manifest experiments/manifests/inner_development_seed8042.csv \
+  --output-audit experiments/manifests/inner_development_seed8042_audit.json
+```
+
+Run the local split test with:
+
+```bash
+PYTHONPATH=experiments python -m unittest \
+  experiments/test_inner_development_split.py
+```
+
+Run `experiments/kaggle_phase2_reliability_inner_matrix.ipynb` with the frozen
+feature dataset and a T4 GPU. The runner executes PyTorch contract tests before
+training all four cells for seeds 42, 123, and 456. It saves raw and effective
+residuals, scalar reliability gates, aligned logits, per-seed metrics, and the
+predeclared advancement-gate decision. A passing candidate may only proceed to
+a separately frozen five-seed original-validation audit; this job cannot open
+original validation or test.
