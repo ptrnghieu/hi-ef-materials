@@ -225,3 +225,16 @@ matrix output and frozen feature dataset. The job computes calibration and
 residual diagnostics and evaluates `context`, `affect_only`,
 `interaction_only`, and `both` inside each saved `both` checkpoint. It performs
 no training or model selection and reads validation only.
+
+
+## Reliability mechanism diagnostic
+
+After the v0.6 failure-mode audit, `experiments/RESEARCH_SPEC_v0.7.md`
+freezes a mechanism-discrimination step before any architecture revision. Run
+`experiments/kaggle_phase1_reliability_diagnostic.ipynb` on CPU with the saved
+canonical residual matrix output. It cross-fits temperature scaling and a
+global residual multiplier by held-out validation source folder, and computes
+label-informed oracle selectors only as upper bounds. The job does not train
+checkpoints, select a model, or access test. Its results determine whether the
+next predeclared experiment should target global calibration, residual
+shrinkage, or sample-conditioned reliability.
