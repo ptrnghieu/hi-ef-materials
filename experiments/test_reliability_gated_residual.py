@@ -126,7 +126,7 @@ class ReliabilityArchitectureTests(unittest.TestCase):
             return context.new_zeros((context.size(0), 7))
 
         model._residual = fake_residual  # type: ignore[method-assign]
-        model.reliability = lambda c, a, i: c.new_ones((c.size(0), 1))  # type: ignore[method-assign]
+        model.reliability_logit = lambda c, a, i: c.new_zeros((c.size(0), 1))  # type: ignore[method-assign]
         context = torch.arange(12, dtype=torch.float32).reshape(3, 4)
         affect = torch.arange(12, dtype=torch.float32).reshape(3, 4) + 100
         interaction = torch.arange(12, dtype=torch.float32).reshape(3, 4) + 200
@@ -168,9 +168,21 @@ class ReliabilityArchitectureTests(unittest.TestCase):
 
     def test_invalid_gate_loss_pushes_gate_down(self) -> None:
         logits = torch.zeros(4, 1, requires_grad=True)
-        gate = torch.sigmoid(logits)
-        invalid_gate_zero_loss(gate).backward()
+        invalid_gate_zero_loss(logits).backward()
         self.assertTrue(bool((logits.grad > 0).all()))
+
+    def test_invalid_gate_loss_is_autocast_safe(self) -> None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        logits = torch.zeros(4, 1, device=device, requires_grad=True)
+        with torch.autocast(
+            device_type=device.type,
+            dtype=torch.float16,
+            enabled=device.type == "cuda",
+        ):
+            loss = invalid_gate_zero_loss(logits)
+        self.assertTrue(torch.isfinite(loss))
+        loss.backward()
+        self.assertIsNotNone(logits.grad)
 
 
 class InnerManifestTests(unittest.TestCase):

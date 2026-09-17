@@ -120,9 +120,19 @@ class ReliabilityGatedResidual(ContextualAffectiveResidual):
     ) -> torch.Tensor:
         if not self.gated:
             return context.new_ones((context.size(0), 1))
+        return torch.sigmoid(self.reliability_logit(context, affect, interaction))
+
+    def reliability_logit(
+        self,
+        context: torch.Tensor,
+        affect: torch.Tensor,
+        interaction: torch.Tensor,
+    ) -> torch.Tensor:
+        if not self.gated:
+            return context.new_zeros((context.size(0), 1))
         assert self.reliability_head is not None
-        return torch.sigmoid(
-            self.reliability_head(torch.cat([context, affect, interaction], dim=-1))
+        return self.reliability_head(
+            torch.cat([context, affect, interaction], dim=-1)
         )
 
     def forward(self, batch: dict[str, object]) -> dict[str, torch.Tensor]:
@@ -164,10 +174,18 @@ class ReliabilityGatedResidual(ContextualAffectiveResidual):
             affect_invalid = torch.zeros_like(affect)
             interaction_invalid = torch.zeros_like(interaction)
         raw_delta = self._residual(context, affect_invalid, interaction_invalid)
-        gate = self.reliability(context, affect_invalid, interaction_invalid)
+        gate_logit = self.reliability_logit(
+            context, affect_invalid, interaction_invalid
+        )
+        gate = (
+            torch.sigmoid(gate_logit)
+            if self.gated
+            else context.new_ones((context.size(0), 1))
+        )
         effective_delta = gate * raw_delta
         return {
             "invalid_raw_delta_logits": raw_delta,
+            "invalid_reliability_logit": gate_logit,
             "invalid_reliability_gate": gate,
             "invalid_delta_logits": effective_delta,
             "invalid_logits": output["context_logits"].detach() + effective_delta,
@@ -182,8 +200,11 @@ def context_consistency_loss(
     return F.kl_div(F.log_softmax(alternative_logits, dim=-1), probability, reduction="batchmean")
 
 
-def invalid_gate_zero_loss(gate: torch.Tensor) -> torch.Tensor:
-    return F.binary_cross_entropy(gate, torch.zeros_like(gate))
+def invalid_gate_zero_loss(gate_logit: torch.Tensor) -> torch.Tensor:
+    """AMP-safe binary loss for the pre-sigmoid invalid-A gate logit."""
+    return F.binary_cross_entropy_with_logits(
+        gate_logit, torch.zeros_like(gate_logit)
+    )
 
 
 def compute_reliability_losses(
@@ -215,7 +236,9 @@ def compute_reliability_losses(
             output["context_logits"], invalid["invalid_logits"]
         )
         if model.gated:
-            invalid_gate = invalid_gate_zero_loss(invalid["invalid_reliability_gate"])
+            invalid_gate = invalid_gate_zero_loss(
+                invalid["invalid_reliability_logit"]
+            )
     total = (
         base["total"]
         + weights["counterfactual"] * counterfactual
